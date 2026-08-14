@@ -96,6 +96,7 @@ function bytesToBase64(bytes) {
 
 export default {
   name: 'dsh-pets',
+  inject: ['webServer', 'tools'],
   apply(ctx) {
     const bySession = new Map();
     let lastActiveSessionId = undefined;
