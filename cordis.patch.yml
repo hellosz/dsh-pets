@@ -1,0 +1,6 @@
+# dsh-pets bundle patch：宠物伙伴插件的 Host 半区。
+# Host 状态引擎 + pet_say 工具 + 通知播报 + 素材路由都在 ./dsh-pets.mjs。
+
+- insert:
+    - id: dsh-pets
+      name: ./dsh-pets.mjs
