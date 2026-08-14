@@ -251,45 +251,6 @@ return {
           ? { left: store.pos.x, top: store.pos.y }
           : { right: 16, bottom: 16 };
 
-        const FALLBACK_ICON = { pikachu: '⚡', charmander: '🔥' };
-        const petBody = base64
-          ? React.createElement('div', {
-              className: 'dsh-pet-body',
-              style: {
-                width: dispW,
-                height: dispH,
-                backgroundImage: bg,
-                backgroundSize: `${8 * 192 * scale}px ${9 * 208 * scale}px`,
-                backgroundPosition: `-${frameIdx * 192 * scale}px -${row * 208 * scale}px`,
-              },
-              onPointerDown: onDown,
-              onPointerMove: onMove,
-              onPointerUp: onUp,
-            })
-          : React.createElement(
-              'div',
-              {
-                className: 'dsh-pet-body',
-                style: {
-                  width: dispW,
-                  height: dispH,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: 'rgba(24,24,27,0.72)',
-                  borderRadius: 12,
-                  fontSize: Math.round(sizePx * 0.4),
-                  lineHeight: 1,
-                },
-                title: assetError ? '素材加载失败：' + (sheet ? '' : '请检查 packs/ 目录') : '加载中…',
-                onPointerDown: onDown,
-                onPointerUp: onUp,
-              },
-              React.createElement('span', null, assetError ? '⚠️' : FALLBACK_ICON[store.petId] || '🐾'),
-              React.createElement('span', { style: { fontSize: 10, marginTop: 4 } }, store.petId),
-            );
-
         const onDown = (e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -328,6 +289,45 @@ return {
           dragRef.current = null;
           if (d && !d.moved) setMenuOpen((v) => !v);
         };
+
+        const FALLBACK_ICON = { pikachu: '⚡', charmander: '🔥' };
+        const petBody = base64
+          ? React.createElement('div', {
+              className: 'dsh-pet-body',
+              style: {
+                width: dispW,
+                height: dispH,
+                backgroundImage: bg,
+                backgroundSize: `${8 * 192 * scale}px ${9 * 208 * scale}px`,
+                backgroundPosition: `-${frameIdx * 192 * scale}px -${row * 208 * scale}px`,
+              },
+              onPointerDown: onDown,
+              onPointerMove: onMove,
+              onPointerUp: onUp,
+            })
+          : React.createElement(
+              'div',
+              {
+                className: 'dsh-pet-body',
+                style: {
+                  width: dispW,
+                  height: dispH,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'rgba(24,24,27,0.72)',
+                  borderRadius: 12,
+                  fontSize: Math.round(sizePx * 0.4),
+                  lineHeight: 1,
+                },
+                title: assetError ? '素材加载失败：' + (sheet ? '' : '请检查 packs/ 目录') : '加载中…',
+                onPointerDown: onDown,
+                onPointerUp: onUp,
+              },
+              React.createElement('span', null, assetError ? '⚠️' : FALLBACK_ICON[store.petId] || '🐾'),
+              React.createElement('span', { style: { fontSize: 10, marginTop: 4 } }, store.petId),
+            );
 
         return React.createElement(
           'div',
