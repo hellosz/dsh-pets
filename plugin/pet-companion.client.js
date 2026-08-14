@@ -128,6 +128,7 @@ return {
 
       function PetOverlay() {
         const [sheet, setSheet] = React.useState(null);
+        const [assetError, setAssetError] = React.useState(false);
         const [hostState, setHostState] = React.useState('idle');
         const [hostLabel, setHostLabel] = React.useState('Idle');
         const [frameIdx, setFrameIdx] = React.useState(0);
@@ -140,6 +141,7 @@ return {
         // load spritesheet for the selected pet
         React.useEffect(() => {
           let alive = true;
+          setAssetError(false);
           (async () => {
             const id = store.petId;
             const cached = assetCache[id];
@@ -152,9 +154,13 @@ return {
               if (res && res.ok) {
                 assetCache[id] = res;
                 if (alive) setSheet(res);
+              } else if (alive) {
+                setAssetError(true);
+                console.error('[pet-companion] asset load failed:', res && res.reason);
               }
-            } catch (_) {
-              /* ignore */
+            } catch (err) {
+              if (alive) setAssetError(true);
+              console.error('[pet-companion] asset load error:', String(err));
             }
           })();
           return () => {
@@ -245,6 +251,45 @@ return {
           ? { left: store.pos.x, top: store.pos.y }
           : { right: 16, bottom: 16 };
 
+        const FALLBACK_ICON = { pikachu: '⚡', charmander: '🔥' };
+        const petBody = base64
+          ? React.createElement('div', {
+              className: 'dsh-pet-body',
+              style: {
+                width: dispW,
+                height: dispH,
+                backgroundImage: bg,
+                backgroundSize: `${8 * 192 * scale}px ${9 * 208 * scale}px`,
+                backgroundPosition: `-${frameIdx * 192 * scale}px -${row * 208 * scale}px`,
+              },
+              onPointerDown: onDown,
+              onPointerMove: onMove,
+              onPointerUp: onUp,
+            })
+          : React.createElement(
+              'div',
+              {
+                className: 'dsh-pet-body',
+                style: {
+                  width: dispW,
+                  height: dispH,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'rgba(24,24,27,0.72)',
+                  borderRadius: 12,
+                  fontSize: Math.round(sizePx * 0.4),
+                  lineHeight: 1,
+                },
+                title: assetError ? '素材加载失败：' + (sheet ? '' : '请检查 packs/ 目录') : '加载中…',
+                onPointerDown: onDown,
+                onPointerUp: onUp,
+              },
+              React.createElement('span', null, assetError ? '⚠️' : FALLBACK_ICON[store.petId] || '🐾'),
+              React.createElement('span', { style: { fontSize: 10, marginTop: 4 } }, store.petId),
+            );
+
         const onDown = (e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -326,19 +371,7 @@ return {
               ),
               React.createElement('div', { className: 'hint' }, '拖拽移动 · 点击开关菜单'),
             ),
-          React.createElement('div', {
-            className: 'dsh-pet-body',
-            style: {
-              width: dispW,
-              height: dispH,
-              backgroundImage: bg,
-              backgroundSize: `${8 * 192 * scale}px ${9 * 208 * scale}px`,
-              backgroundPosition: `-${frameIdx * 192 * scale}px -${row * 208 * scale}px`,
-            },
-            onPointerDown: onDown,
-            onPointerMove: onMove,
-            onPointerUp: onUp,
-          }),
+          petBody,
         );
       }
 
