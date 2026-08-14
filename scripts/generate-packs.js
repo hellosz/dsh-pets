@@ -7,9 +7,10 @@
  *       5 failed, 6 waiting, 7 running, 8 review.
  *
  * idle uses real frames from the official fifth-generation animated GIF
- * (PokeAPI generation-v/black-white/animated). The other rows are derived
- * programmatically from the classic front sprite (transforms: mirror, offset,
- * bounce, wiggle, tint, breathing pulse).
+ * (PokeAPI generation-v/black-white/animated), so it has genuine blink /
+ * breathe / tail-sway motion. The other rows are derived programmatically
+ * from the classic front sprite with amplified offsets (mirror, bounce, jump,
+ * wiggle, tint) so the motion reads clearly at small sizes.
  *
  * Dependency: ImageMagick 6+ (`convert`) on PATH. No npm deps.
  * Usage: node scripts/generate-packs.js
@@ -40,6 +41,7 @@ const STATES = [
 const FRAME_W = 192;
 const FRAME_H = 208;
 const GRID_COLS = 8; // petdex v1: 8 columns x 9 rows (9 states)
+const SPRITE_SIZE = 144; // classic sprite scaled up inside the 192x208 frame
 
 function sh(args, opts = {}) {
   try {
@@ -51,43 +53,41 @@ function sh(args, opts = {}) {
 }
 
 function tmp(name) {
-  const p = path.join(OUT, '.tmp-' + name + '.png');
-  return p;
+  return path.join(OUT, '.tmp-' + name + '-' + Math.random().toString(36).slice(2) + '.png');
 }
 
-/** Build a 192x208 transparent frame with `sprite` composited at center + offset (sprite is 144px max-dim). */
+/** Build a 192x208 transparent frame with `sprite` composited at center + offset. */
 function frame(spritePng, dx, dy, rotateDeg = 0, scalePct = 100) {
-  // Optional rotate: produce a rotated copy first.
   let src = spritePng;
   if (rotateDeg !== 0) {
-    const rp = tmp('rot' + Math.round(rotateDeg) + '-' + Math.random().toString(36).slice(2));
+    const rp = tmp('rot' + Math.round(rotateDeg));
     sh(['-background', 'none', spritePng, '-rotate', String(rotateDeg), rp]);
     src = rp;
   }
   let final = src;
   if (scalePct !== 100) {
-    const sp = tmp('scl' + scalePct + '-' + Math.random().toString(36).slice(2));
+    const sp = tmp('scl' + scalePct);
     sh(['-background', 'none', src, '-filter', 'point', '-resize', scalePct + '%', sp]);
     final = sp;
   }
-  const cx = Math.round((FRAME_W - 144) / 2) + dx;
-  const cy = Math.round(FRAME_H - 10 - 144) + dy; // 144px sprite, 10px bottom margin
-  const out = tmp('f-' + Math.random().toString(36).slice(2));
+  const cx = Math.round((FRAME_W - SPRITE_SIZE) / 2) + dx;
+  const cy = Math.round(FRAME_H - 10 - SPRITE_SIZE) + dy; // 10px bottom margin
+  const out = tmp('f');
   sh(['-size', `${FRAME_W}x${FRAME_H}`, 'xc:none', final, '-geometry', `+${cx}+${cy}`, '-composite', out]);
   return out;
 }
 
-/** Prepare base sprite: scale max-dim to 144 with point filter. */
+/** Prepare base sprite: classic front sprite scaled up to 144 with point filter. */
 function prepareBase(petDir) {
   const src = path.join(petDir, 'front-classic.png');
-  const out = tmp('base-' + Math.random().toString(36).slice(2));
-  sh(['-background', 'none', src, '-filter', 'point', '-resize', '144x144', out]);
+  const out = tmp('base');
+  sh(['-background', 'none', src, '-filter', 'point', '-resize', `${SPRITE_SIZE}x${SPRITE_SIZE}`, out]);
   return out;
 }
 
-/** Extract `n` evenly sampled frames from an animated GIF, each scaled to max-dim 144. */
+/** Extract `n` evenly sampled frames from the official animated GIF, scaled to 144. */
 function extractIdleFrames(gifPath, n) {
-  const dir = tmp('idle-' + Math.random().toString(36).slice(2));
+  const dir = tmp('idle');
   fs.mkdirSync(dir, { recursive: true });
   sh(['-coalesce', gifPath, path.join(dir, 'f-%02d.png')]);
   const files = fs.readdirSync(dir).filter((f) => f.endsWith('.png')).sort();
@@ -96,24 +96,23 @@ function extractIdleFrames(gifPath, n) {
     const idx = Math.min(files.length - 1, Math.round((i * (files.length - 1)) / (n - 1)));
     picks.push(path.join(dir, files[idx]));
   }
-  const scaled = picks.map((f, i) => {
-    const s = tmp('idle-s' + i + '-' + Math.random().toString(36).slice(2));
-    sh(['-background', 'none', f, '-filter', 'point', '-resize', '144x144', s]);
+  return picks.map((f, i) => {
+    const s = tmp('idle-s' + i);
+    sh(['-background', 'none', f, '-filter', 'point', '-resize', `${SPRITE_SIZE}x${SPRITE_SIZE}`, s]);
     return s;
   });
-  return scaled;
 }
 
-/** Compose one state row: `frames` images +pad to 9 cols, horizontally appended. */
+/** Compose one state row: `frames` images + pad to 8 cols, horizontally appended. */
 function row(frames, count) {
   const list = [];
   for (let i = 0; i < count; i++) list.push(frames[i]);
   while (list.length < GRID_COLS) {
-    const e = tmp('empty-' + Math.random().toString(36).slice(2));
+    const e = tmp('empty');
     sh(['-size', `${FRAME_W}x${FRAME_H}`, 'xc:none', e]);
     list.push(e);
   }
-  const out = tmp('row-' + Math.random().toString(36).slice(2));
+  const out = tmp('row');
   sh(['-background', 'none', ...list, '+append', out]);
   return out;
 }
@@ -125,8 +124,6 @@ function generate(pet) {
 
   const base = prepareBase(petDir);
   const idleGif = path.join(petDir, 'idle-animated.gif');
-
-  // --- Row 0: idle (real official frames) ---
   const idleSrc = fs.existsSync(idleGif) ? extractIdleFrames(idleGif, STATES[0].frames) : null;
 
   const rows = [];
@@ -134,52 +131,53 @@ function generate(pet) {
     const n = st.frames;
     const frames = [];
     if (st.id === 'idle' && idleSrc) {
+      // real official animation frames
       for (let i = 0; i < n; i++) frames.push(frame(idleSrc[i], 0, 0));
     } else {
-      let sprite = base;
-      let flip = false;
       for (let i = 0; i < n; i++) {
-        let dx = 0, dy = 0, rot = 0, scl = 100, use = sprite;
+        let dx = 0, dy = 0, rot = 0, scl = 100, use = base;
         switch (st.id) {
           case 'running-right': {
             const t = (i / n) * Math.PI * 2;
-            dx = Math.round(Math.sin(t) * 22);
-            dy = Math.round(Math.abs(Math.sin(t)) * 6);
+            dx = Math.round(Math.sin(t) * 34);
+            dy = Math.round(Math.abs(Math.sin(t)) * 10);
+            rot = 5;
             break;
           }
           case 'running-left': {
-            if (!flip) {
-              const f = tmp('flop-' + Math.random().toString(36).slice(2));
-              sh(['-background', 'none', sprite, '-flop', f]);
-              use = f;
-              flip = true;
-            }
+            const f = tmp('flop');
+            sh(['-background', 'none', base, '-flop', f]);
+            use = f;
             const t = (i / n) * Math.PI * 2;
-            dx = -Math.round(Math.sin(t) * 22);
-            dy = Math.round(Math.abs(Math.sin(t)) * 6);
+            dx = -Math.round(Math.sin(t) * 34);
+            dy = Math.round(Math.abs(Math.sin(t)) * 10);
+            rot = -5;
             break;
           }
           case 'waving':
-            rot = [0, 8, 0, -8][i] || 0;
+            rot = [0, 18, 0, -18][i] || 0;
             break;
           case 'jumping':
-            dy = [0, -34, -52, -34, 0][i] || 0;
+            dy = [0, -42, -66, -42, 0][i] || 0;
             break;
           case 'failed': {
-            const f = tmp('fail-' + Math.random().toString(36).slice(2));
-            sh(['-background', 'none', sprite, '-modulate', '100,20,100', '-fill', '#4a6fa5', '-colorize', '25%', f]);
+            const f = tmp('fail');
+            sh(['-background', 'none', base, '-modulate', '100,18,100', '-fill', '#4a6fa5', '-colorize', '28%', f]);
             use = f;
-            dx = [0, 2, -2, 0, 2, -2, 0, 0][i] || 0;
+            dx = [0, 4, -4, 0, 4, -4, 0, 0][i] || 0;
             break;
           }
           case 'waiting':
-            scl = [100, 104, 107, 104, 100, 100][i] || 100;
+            rot = [0, -8, -14, -8, 0, 0][i] || 0;
+            dy = [0, -4, 0, -4, 0, 0][i] || 0;
             break;
           case 'running':
-            dy = [0, -12, -20, -12, 0, 0][i] || 0;
+            dy = [0, -22, -36, -22, 0, 0][i] || 0;
+            rot = [-4, -2, 0, 2, 4, 0][i] || 0;
             break;
           case 'review':
-            rot = [-3, 0, 3, 0, -3, 0][i] || 0;
+            rot = [-4, -8, -12, -8, -4, 0][i] || 0;
+            scl = [100, 101, 102, 101, 100, 100][i] || 100;
             break;
           default:
             break;
@@ -190,7 +188,7 @@ function generate(pet) {
     rows.push(row(frames, n));
   }
 
-  const sheet = tmp('sheet-' + Math.random().toString(36).slice(2));
+  const sheet = tmp('sheet');
   sh(['-background', 'none', ...rows, '-append', sheet]);
 
   const finalSheet = path.join(outDir, 'spritesheet.png');
@@ -218,12 +216,12 @@ const PETS = [
   {
     id: 'pikachu',
     displayName: 'Pikachu',
-    description: '皮卡丘（Pikachu #25）—— 来自 PokeAPI 官方第五世代动画帧 + 经典正面精灵派生的宠物伙伴。',
+    description: '皮卡丘（Pikachu #25）—— 活泼好动的电系伙伴。',
   },
   {
     id: 'charmander',
     displayName: 'Charmander',
-    description: '小火龙（Charmander #4）—— 来自 PokeAPI 官方第五世代动画帧 + 经典正面精灵派生的宠物伙伴。',
+    description: '小火龙（Charmander #4）—— 倔强认真的火系伙伴。',
   },
 ];
 
