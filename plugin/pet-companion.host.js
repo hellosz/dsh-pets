@@ -59,6 +59,23 @@ function emptyEntry() {
   };
 }
 
+// Byte-level base64 (no TextDecoder/btoa: the harness btoa is UTF-8 text and
+// would corrupt binary PNG bytes into an invalid data: URL).
+const B64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+function bytesToBase64(bytes) {
+  let out = '';
+  for (let i = 0; i < bytes.length; i += 3) {
+    const b0 = bytes[i];
+    const b1 = bytes[i + 1];
+    const b2 = bytes[i + 2];
+    out += B64_CHARS[b0 >> 2];
+    out += B64_CHARS[((b0 & 3) << 4) | (b1 === undefined ? 0 : b1 >> 4)];
+    out += b1 === undefined ? '=' : B64_CHARS[((b1 & 15) << 2) | (b2 === undefined ? 0 : b2 >> 6)];
+    out += b2 === undefined ? '=' : B64_CHARS[b2 & 63];
+  }
+  return out;
+}
+
 return {
     apply(ctx) {
       const bySession = new Map();
@@ -216,11 +233,7 @@ return {
           const target = await locatePack(petId);
           if (!target) return { petId, ok: false, reason: 'pack-not-found' };
           const bytes = await fsSvc.readBytes(target, undefined, 8 * 1024 * 1024);
-          const bin = new TextDecoder('latin1').decode(bytes);
-          let b64 = '';
-          for (let i = 0; i < bin.length; i += 32768) {
-            b64 += btoa(bin.slice(i, i + 32768));
-          }
+          const b64 = bytesToBase64(bytes);
           const result = { petId, ok: true, dataBase64: b64 };
           assetCache.set(petId, result);
           return result;
