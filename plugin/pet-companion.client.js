@@ -149,37 +149,45 @@ return {
           display: flex;
           flex-direction: column;
           align-items: flex-end;
-          gap: 3px;
-          max-width: 200px;
+          gap: 4px;
+          max-width: 300px;
         }
         .dsh-pet-status .line {
           display: flex;
           align-items: center;
           gap: 6px;
-          padding: 3px 10px;
+          padding: 4px 11px;
           border-radius: 999px;
           background: rgba(24, 24, 27, 0.88);
           color: #f4f4f5;
-          font: 11px/1.5 system-ui, -apple-system, sans-serif;
+          font: 12px/1.5 system-ui, -apple-system, sans-serif;
           white-space: nowrap;
           box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
           backdrop-filter: blur(6px);
         }
         .dsh-pet-status .dot {
-          width: 7px;
-          height: 7px;
+          width: 8px;
+          height: 8px;
           border-radius: 50%;
           background: #94a3b8;
           box-shadow: 0 0 0 3px rgba(255,255,255,0.12);
         }
         .dsh-pet-status .phrase {
-          padding: 3px 10px;
-          border-radius: 10px;
-          background: rgba(24, 24, 27, 0.78);
-          color: #e4e4e7;
-          font: 11px/1.5 system-ui, -apple-system, sans-serif;
+          padding: 5px 12px;
+          border-radius: 12px;
+          background: rgba(24, 24, 27, 0.82);
+          color: #ececef;
+          font: 12px/1.5 system-ui, -apple-system, sans-serif;
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
           backdrop-filter: blur(6px);
+        }
+        .dsh-pet-status .phrase.notice {
+          background: #f59e0b;
+          color: #1c1200;
+          font-weight: 700;
+          font-size: 13px;
+          border: none;
+          box-shadow: 0 3px 16px rgba(245, 158, 11, 0.55);
         }
         .dsh-pet-backdrop {
           position: fixed;
@@ -292,6 +300,7 @@ return {
         const [frameIdx, setFrameIdx] = React.useState(0);
         const [menuOpen, setMenuOpen] = React.useState(false);
         const [pos, setPos] = React.useState(null); // {x,y}; null = default bottom-right
+        const [notice, setNotice] = React.useState(null); // notification text from Host
         const wrapRef = React.useRef(null);
         const dragRef = React.useRef(null);
         const animRef = React.useRef({ anim: 'idle', until: 0, nextRandomAt: Date.now() + 6000, acc: 0 });
@@ -344,6 +353,7 @@ return {
                   hostStateRef.current = s.state;
                   setHostState(s.state);
                 }
+                setNotice((s && s.notice) || null);
               },
               () => {},
             );
@@ -517,7 +527,7 @@ return {
             React.createElement('span', { className: 'dot', style: { background: meta.color } }),
             React.createElement('span', null, meta.zh),
           ),
-          React.createElement('div', { className: 'phrase' }, phraseRef.current.text),
+          React.createElement('div', { className: 'phrase' + (notice ? ' notice' : '') }, notice || phraseRef.current.text),
         );
 
         const menu = React.createElement(

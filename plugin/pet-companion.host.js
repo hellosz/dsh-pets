@@ -31,6 +31,26 @@ const LABELS = {
 const WAITING_HOLD_MS = 90 * 1000;
 const FAILED_HOLD_MS = 25 * 1000;
 const REVIEW_HOLD_MS = 12 * 1000;
+const NOTICE_HOLD_MS = 8 * 1000;
+
+// Prompt that asks the fixed light model to compress a notification into a
+// short first-person pet line.
+const SUMMARIZE_PROMPT =
+  '把下面的通知总结成一句不超过 18 个字的简体中文台词，用可爱宠物助手的口吻（第一人称），直接给出台词，不要引号、不要任何解释：\n\n';
+
+// Extract a short human-readable string from an event payload leaf
+// (error / reason / title / message), without recursing into live data.
+function extractText(x) {
+  if (!x) return '';
+  if (typeof x === 'string') return x;
+  if (typeof x === 'number') return String(x);
+  if (typeof x.message === 'string') return x.message;
+  if (typeof x.reason === 'string') return x.reason;
+  if (typeof x.title === 'string') return x.title;
+  if (typeof x.summary === 'string') return x.summary;
+  if (typeof x.name === 'string') return x.name;
+  return '';
+}
 
 function sidOf(x) {
   if (!x) return undefined;
@@ -54,6 +74,8 @@ function emptyEntry() {
     waiting: null, // { seq, until }
     failed: null, // until
     review: null, // until
+    notice: null, // { text, until } — notification text the pet speaks
+    summarizing: false, // guard: one LLM summary in flight per session
     revision: 0,
     lastChange: Date.now(),
   };
@@ -81,6 +103,8 @@ return {
       const bySession = new Map();
       let lastActiveSessionId = undefined;
       let waitingSeq = 0;
+      let summarizeUnavailable = false; // summary disabled after first detection
+      let summarizeWarned = false; // warned once about unavailable summary
 
       function mark(sid, patch) {
         if (!sid) return;
@@ -100,6 +124,111 @@ return {
         e.lastChange = Date.now();
         e.revision += 1;
       }
+
+      // Record a notification the pet should speak (motion + text, both).
+      // `skipSummarize` lets an already-crafted line (e.g. pet_say) bypass the
+      // v4-flash compression pass so it shows instantly and verbatim.
+      function setNotice(sid, text, holdMs, skipSummarize) {
+        if (!sid || !text) return;
+        const e = bySession.get(sid) || emptyEntry();
+        e.notice = { text: String(text).slice(0, 160), until: Date.now() + (holdMs || NOTICE_HOLD_MS) };
+        e.lastChange = Date.now();
+        e.revision += 1;
+        bySession.set(sid, e);
+        lastActiveSessionId = sid;
+        // Asynchronously compress the raw notification into a short pet line
+        // with the fixed light model; on failure the raw text stays.
+        if (!skipSummarize && !e.summarizing) {
+          e.summarizing = true;
+          summarizeNotice(sid, e.notice.text, holdMs).finally(() => {
+            const cur = bySession.get(sid);
+            if (cur) cur.summarizing = false;
+          });
+        }
+      }
+
+      // Summarize a notification into a short pet line using deepseek-v4-flash.
+      // Once the provider is confirmed unavailable, we fall back to raw text
+      // silently and only warn the first time.
+      function markSummarizeUnavailable() {
+        summarizeUnavailable = true;
+        if (!summarizeWarned) {
+          summarizeWarned = true;
+          console.warn('[pet-companion] 通知总结不可用（deepseek-official 未配置），将直接显示原文');
+        }
+      }
+
+      async function summarizeNotice(sid, text, holdMs) {
+        if (summarizeUnavailable) return;
+        const llmSvc = ctx.get('llm');
+        if (!llmSvc) return markSummarizeUnavailable();
+        let providers;
+        try {
+          providers = llmSvc.listProviders();
+        } catch (_) {
+          return markSummarizeUnavailable();
+        }
+        if (!providers || !providers.some((p) => p && p.id === 'deepseek-official')) {
+          return markSummarizeUnavailable();
+        }
+        try {
+          const chunks = llmSvc.stream({
+            provider: 'deepseek-official',
+            model: 'deepseek-v4-flash',
+            messages: [
+              { role: 'user', content: [{ type: 'text', text: SUMMARIZE_PROMPT + text }] },
+            ],
+            maxTokens: 80,
+          });
+          let out = '';
+          for await (const chunk of chunks) {
+            if (chunk && chunk.type === 'text-delta' && chunk.text) out += chunk.text;
+          }
+          const summary = out.trim().replace(/^["'「【\s]+|["'」】\s]+$/g, '').slice(0, 40);
+          if (summary) {
+            const e = bySession.get(sid);
+            if (e && e.notice) {
+              e.notice.text = summary;
+              e.notice.until = Date.now() + (holdMs || NOTICE_HOLD_MS);
+              e.revision += 1;
+              e.lastChange = Date.now();
+            }
+          }
+        } catch (_) {
+          // Transient failure (network/timeout): keep raw text, no spam.
+        }
+      }
+
+      // ---- dynamic tool: let the main agent command the pet to speak ----
+      harness.registerTool(ctx, harness.defineTool({
+        name: 'pet_say',
+        description: '让屏幕右下角的宠物伙伴开口说一句话，显示在宠物头顶的气泡里。适合给用户一句轻松的提示、鼓励、提醒或状态播报，台词要简短口语化。',
+        parameters: {
+          type: 'object',
+          properties: {
+            text: { type: 'string', description: '让宠物说的台词，简体中文，20 字以内' },
+          },
+          required: ['text'],
+        },
+        output: {
+          schema: {
+            type: 'object',
+            properties: {
+              ok: { type: 'boolean' },
+              text: { type: 'string' },
+            },
+            additionalProperties: false,
+          },
+          render: (args, value) => [{ type: 'text', text: '宠物已说：' + (value && value.text || '') }],
+        },
+        async execute(args, exec) {
+          const text = String(args && args.text || '').trim().slice(0, 40);
+          if (!text) return { ok: false, text: '' };
+          const sid = sidOf(exec && exec.agent) || lastActiveSessionId;
+          setNotice(sid, text, 10 * 1000, true); // skip summarize: the line is already final
+          return { ok: true, text };
+        },
+      }));
 
       function computeState(sid) {
         const e = bySession.get(sid) || emptyEntry();
@@ -127,17 +256,22 @@ return {
       ctx.on('agent/turn-stopping', (payload) => {
         const sid = sidOf(payload && payload.agent);
         mark(sid, { review: Date.now() + REVIEW_HOLD_MS });
+        setNotice(sid, '回合完成，待你审查', REVIEW_HOLD_MS);
       });
 
       ctx.on('agent/error', (payload) => {
         const sid = sidOf(payload && payload.agent);
         mark(sid, { failed: Date.now() + FAILED_HOLD_MS, status: 'idle' });
+        const errText = extractText(payload && payload.error);
+        if (errText) setNotice(sid, '出错了：' + errText, FAILED_HOLD_MS);
       });
 
       ctx.on('approval/request', (req, next) => {
         const sid = sidOf(req);
         const seq = ++waitingSeq;
         mark(sid, { waiting: { seq, until: Date.now() + WAITING_HOLD_MS } });
+        const reason = extractText(req && (req.reason || req.title || req.question));
+        if (reason) setNotice(sid, '等你确认：' + reason, WAITING_HOLD_MS);
         const p = Promise.resolve(next());
         p.then(
           () => clearWaitingIf(sid, seq),
@@ -181,6 +315,16 @@ return {
         if (e && e.workflows > 0) mark(sid, { workflows: e.workflows - 1 });
       });
 
+      ctx.on('workflow/log', (info, message) => {
+        const sid = sidOf(info);
+        if (message) setNotice(sid, message, NOTICE_HOLD_MS);
+      });
+
+      ctx.on('workflow/phase', (info, title) => {
+        const sid = sidOf(info);
+        if (title) setNotice(sid, '阶段：' + title, NOTICE_HOLD_MS);
+      });
+
       ctx.on('session/disposed', (session) => {
         const sid = sidOf(session);
         if (sid) bySession.delete(sid);
@@ -193,10 +337,13 @@ return {
         const sid = typeof req.sessionId === 'string' ? req.sessionId : lastActiveSessionId;
         const e = bySession.get(sid) || emptyEntry();
         const { state, label } = computeState(sid);
+        const now = Date.now();
+        const notice = e.notice && now < e.notice.until ? e.notice.text : null;
         return {
           sessionId: sid || null,
           state,
           label,
+          notice,
           revision: e.revision,
           petId: typeof req.petId === 'string' ? req.petId : 'pikachu',
         };
