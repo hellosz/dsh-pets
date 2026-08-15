@@ -17,10 +17,12 @@
  */
 'use strict';
 
-const { execFileSync } = require('node:child_process');
-const fs = require('node:fs');
-const path = require('node:path');
+import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
 const SPRITES = path.join(ROOT, 'sprites');
 const OUT = path.join(ROOT, 'packs');
@@ -222,6 +224,46 @@ const PETS = [
     id: 'charmander',
     displayName: 'Charmander',
     description: '小火龙（Charmander #4）—— 倔强认真的火系伙伴。',
+  },
+  {
+    id: 'bulbasaur',
+    displayName: 'Bulbasaur',
+    description: '妙蛙种子（Bulbasaur #1）—— 背上种子会随心情发芽的草系伙伴。',
+  },
+  {
+    id: 'squirtle',
+    displayName: 'Squirtle',
+    description: '杰尼龟（Squirtle #7）—— 圆壳水系的可靠伙伴。',
+  },
+  {
+    id: 'jigglypuff',
+    displayName: 'Jigglypuff',
+    description: '胖丁（Jigglypuff #39）—— 爱唱歌的圆滚滚伙伴。',
+  },
+  {
+    id: 'eevee',
+    displayName: 'Eevee',
+    description: '伊布（Eevee #133）—— 毛茸茸、可进化成多种形态的可爱伙伴。',
+  },
+  {
+    id: 'mew',
+    displayName: 'Mew',
+    description: '梦幻（Mew #151）—— 粉粉嫩嫩的幻之宝可梦，会隐身和变身。',
+  },
+  {
+    id: 'piplup',
+    displayName: 'Piplup',
+    description: '波加曼（Piplup #393）—— 骄傲的小企鹅水系伙伴。',
+  },
+  {
+    id: 'rowlet',
+    displayName: 'Rowlet',
+    description: '木木枭（Rowlet #722）—— 圆脸会转头的草系猫头鹰伙伴。',
+  },
+  {
+    id: 'grookey',
+    displayName: 'Grookey',
+    description: '敲音猴（Grookey #810）—— 拿着木棒敲节奏的猴系伙伴。',
   },
 ];
 

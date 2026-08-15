@@ -22,12 +22,12 @@ AI coding agent 跑长任务时（几分钟到十几分钟），你无法直观�
 
 ## 特性
 
-- 🖼️ **内置两只宠物**：皮卡丘（#25）与小火龙（#4）
-  - idle 动画来自 PokeAPI 第五世代官方动画帧
+- 🖼️ **内置 10 只宠物**：皮卡丘、小火龙、妙蛙种子、杰尼龟、胖丁、伊布、梦幻、波加曼、木木枭、敲音猴
+  - idle 动画来自 PokeAPI 第五世代官方动画帧（或 Pokémon Showdown 动画）
   - 其余 8 个状态由经典精灵程序化派生（翻转/弹跳/挥手/沮丧/呼吸/跑动/审查）
 - 🎬 **9 状态动画**：idle / running / waiting / review / failed / waving / jumping / running-left / running-right
 - 📍 **浮动宠物**：注册到 `shell.overlay`，右下角常驻，可拖拽、点击弹菜单、一键隐藏；状态气泡与配置菜单跟随宠物
-- 💬 **性格与口头禅**：皮卡丘活泼、小火龙倔强，各自有性格台词随状态切换（"交给我吧，皮卡！"/"烧起来了！"），动画节奏也有快慢差异
+- 💬 **性格与口头禅**：每只宠物都有独立性格、台词和动画节奏（"交给我吧，皮卡！"/"烧起来了！"）
 - ⚙️ **设置页**：Settings → 宠物伙伴，切换宠物、缩放滑块（0.6x–2.5x）、开关
 - 📦 **petdex 兼容宠物包格式**：`pet.json` + 8×9 spritesheet（每帧 192×208）——社区标准，未来可直接导入 petdex.dev 上 4500+ 个社区宠物
 - 🔌 **零侵入**：只监听 DSH 现有事件（emit 模式），不阻塞、不篡改任何流程
@@ -77,9 +77,9 @@ lib/client.js                # Client 预构建产物：window.__ModuleLoader__.
 plugin/
 ├── pet-companion.host.js    # 动态插件 Host（会话内 cordis_define 用，与 dsh-pets.mjs 功能一致）
 └── pet-companion.client.js  # 动态插件 Client（会话内 cordis_define 用）
-packs/
-├── pikachu/{pet.json, spritesheet.png}
-└── charmander/{pet.json, spritesheet.png}
+packs/<id>/
+├── pet.json               # petdex 元数据（10 只）
+└── spritesheet.png        # 8×9 spritesheet
 scripts/generate-packs.js    # 从 sprites/ 源素材生成宠物包（ImageMagick）
 sprites/                     # 源素材（PokeAPI / Showdown 精灵）
 docs/                        # 预览图
