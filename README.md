@@ -36,20 +36,22 @@ AI coding agent 跑长任务时（几分钟到十几分钟），你无法直观�
 
 ### 前置条件
 
-- Node.js ≥ 22，`pnpm` 已加入 PATH（`dsh plugin` 会在 profile 目录内转发给 pnpm）
-- DeepSeek Harness 已可运行 `dsh web`（验证于 dsh 0.1.0-rc.6）
+- Node.js ≥ 22
+- 已安装 DeepSeek Harness CLI：`npm install -g @deepseek-ai/dsh`
+- 已安装 `pnpm`（`dsh plugin` 内部会调用 pnpm；可执行 `corepack enable`）
 
-### 方式一：一键安装到 web profile（推荐）
+### 安装插件
 
 ```bash
-# 已发布到 npm 后（推荐）
 dsh plugin --profile web add @hellosz/dsh-pets
-
-# 或从本地目录安装（开发/试用；务必带 file: 前缀，避免 link 到源码目录后解析不到依赖）
-dsh plugin --profile web add file:/var/www/python/dsh-pets
-
-# 重启/启动 DSH Web
 dsh web
+```
+
+如果使用 `npx` 启动 dsh，则对应命令为：
+
+```bash
+npx @deepseek-ai/dsh plugin --profile web add @hellosz/dsh-pets
+npx @deepseek-ai/dsh web
 ```
 
 安装后验证：
@@ -58,38 +60,13 @@ dsh web
 dsh --profile web --dump-config | grep -A2 'dsh-pets'
 ```
 
-浏览器打开 `http://localhost:3080`，皮卡丘会出现在右下角。卸载：
+浏览器打开 `http://localhost:3080`，皮卡丘会出现在右下角。
+
+卸载：
 
 ```bash
 dsh plugin --profile web remove @hellosz/dsh-pets
 ```
-
-### 方式二：手动登记 profile（等效替代）
-
-如果不想用 `dsh plugin`，可在 `~/.dsh/profiles/web/package.json` 中手工加入：
-
-```jsonc
-{
-  "dependencies": {
-    "@hellosz/dsh-pets": "file:/var/www/python/dsh-pets"
-  },
-  "dsh": {
-    "profile": {
-      "bundles": [
-        "@deepseek-ai/dsh-base",
-        "@deepseek-ai/dsh-web-app",
-        "@hellosz/dsh-pets"
-      ]
-    }
-  }
-}
-```
-
-然后在 profile 目录执行 `pnpm install` 并重启 `dsh web`。
-
-### 方式三：动态插件（仅限 DSH 会话内试用）
-
-在 DSH 会话中使用 `cordis_define` + `cordis_run` 加载 `plugin/pet-companion.host.js` 与 `plugin/pet-companion.client.js`，批准后皮卡丘就会出现。
 
 ## 架构
 
