@@ -16,8 +16,7 @@
  * This is a Cordis plugin body: plain JavaScript, no imports, no JSX.
  */
 const PACKS_DIR_CANDIDATES = [
-  '/var/www/coding/dsh/pets/packs', // dev workspace (this session)
-  'packs', // workspace-root-relative (open-source installs)
+  'packs', // workspace-root-relative（动态插件场景；bundle 安装请使用 dsh-pets.mjs）
 ];
 
 const LABELS = {

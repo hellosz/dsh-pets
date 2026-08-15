@@ -34,26 +34,72 @@ AI coding agent 跑长任务时（几分钟到十几分钟），你无法直观�
 
 ## 快速开始
 
-### 方式一：动态插件（开发/试用）
+### 前置条件
+
+- Node.js ≥ 22，`pnpm` 已加入 PATH（`dsh plugin` 会在 profile 目录内转发给 pnpm）
+- DeepSeek Harness 已可运行 `dsh web`（验证于 dsh 0.1.0-rc.6）
+
+### 方式一：一键安装到 web profile（推荐）
 
 ```bash
-git clone https://github.com/<your-org>/dsh-pet-companion.git
-cd dsh-pet-companion
-# 确保 packs/ 目录在 DSH 会话工作区可见（插件 Host 端默认从工作区根目录的 packs/ 读取）
+# 已发布到 npm 后（推荐）
+dsh plugin --profile web add @hellosz/dsh-pets
+
+# 或从本地目录安装（开发/试用；务必带 file: 前缀，避免 link 到源码目录后解析不到依赖）
+dsh plugin --profile web add file:/var/www/python/dsh-pets
+
+# 重启/启动 DSH Web
+dsh web
 ```
 
+安装后验证：
+
+```bash
+dsh --profile web --dump-config | grep -A2 'dsh-pets'
+```
+
+浏览器打开 `http://localhost:3080`，皮卡丘会出现在右下角。卸载：
+
+```bash
+dsh plugin --profile web remove @hellosz/dsh-pets
+```
+
+### 方式二：手动登记 profile（等效替代）
+
+如果不想用 `dsh plugin`，可在 `~/.dsh/profiles/web/package.json` 中手工加入：
+
+```jsonc
+{
+  "dependencies": {
+    "@hellosz/dsh-pets": "file:/var/www/python/dsh-pets"
+  },
+  "dsh": {
+    "profile": {
+      "bundles": [
+        "@deepseek-ai/dsh-base",
+        "@deepseek-ai/dsh-web-app",
+        "@hellosz/dsh-pets"
+      ]
+    }
+  }
+}
+```
+
+然后在 profile 目录执行 `pnpm install` 并重启 `dsh web`。
+
+### 方式三：动态插件（仅限 DSH 会话内试用）
+
 在 DSH 会话中使用 `cordis_define` + `cordis_run` 加载 `plugin/pet-companion.host.js` 与 `plugin/pet-companion.client.js`，批准后皮卡丘就会出现。
-
-### 方式二：作为仓库插件安装（规划中）
-
-插件包结构已就绪，后续提供一键安装脚本。
 
 ## 架构
 
 ```
+dsh-pets.mjs                 # Host 入口（bundle 主入口）：状态引擎 + pet/state、pet/asset 路由 + pet_say 工具
+cordis.patch.yml             # dsh bundle patch：向 profile 插件树插入本插件行
+lib/client.js                # Client 预构建产物：window.__ModuleLoader__.load 工厂
 plugin/
-├── pet-companion.host.js    # Host: 状态引擎（事件→状态机）+ pet/state、pet/asset RPC
-└── pet-companion.client.js  # Client: shell.overlay 浮动宠物 + settings.section 设置页
+├── pet-companion.host.js    # 动态插件 Host（会话内 cordis_define 用，与 dsh-pets.mjs 功能一致）
+└── pet-companion.client.js  # 动态插件 Client（会话内 cordis_define 用）
 packs/
 ├── pikachu/{pet.json, spritesheet.png}
 └── charmander/{pet.json, spritesheet.png}
@@ -64,7 +110,7 @@ docs/                        # 预览图
 
 **状态优先级**：`waiting（审批） > failed（错误） > review（回合结束） > running（思考/工具/子代理） > idle`
 
-**数据流**：Host 监听 `agent/status`、`agent/turn-stopping`、`agent/error`、`approval/request`、`tools/execute|result`、`subagent/start|end`、`workflow/start|end` → 推导状态 → Client 每 600ms 轮询 `pet/state` → 播放对应动画行。
+**数据流**：Host 监听 `agent/status`、`agent/turn-stopping`、`agent/error`、`approval/request`、`tools/execute|result`、`subagent/start|end`、`workflow/start|end` → 推导状态 → 通过 `webServer` 暴露 `GET /pet/state` 与 `GET /pet/asset` → Client 每 600ms 轮询 `pet/state` → 播放对应动画行。
 
 ## 宠物包格式（petdex 兼容 v1）
 

@@ -18,9 +18,9 @@ import { dirname, join } from 'node:path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PACKS_DIR_CANDIDATES = [
   join(__dirname, 'packs'), // 包内资源（npm 安装后，与 dsh-pets.mjs 同级）
-  '/var/www/coding/dsh/pets/packs', // 项目目录（本地开发）
-  'packs', // workspace-root-relative
+  'packs', // workspace-root-relative（源码动态插件/工作区场景）
 ];
+const PET_ID_RE = /^[a-zA-Z0-9_-]+$/;
 
 const LABELS = {
   idle: { zh: '空闲', en: 'Idle' },
@@ -96,7 +96,7 @@ function bytesToBase64(bytes) {
 
 export default {
   name: 'dsh-pets',
-  inject: ['webServer', 'tools'],
+  inject: ['webServer', 'tools', 'fs'],
   apply(ctx) {
     const bySession = new Map();
     let lastActiveSessionId = undefined;
@@ -150,7 +150,12 @@ export default {
 
     async function summarizeNotice(sid, text, holdMs) {
       if (summarizeUnavailable) return;
-      const llmSvc = ctx.get('llm');
+      let llmSvc;
+      try {
+        llmSvc = ctx.get('llm');
+      } catch (_) {
+        llmSvc = undefined;
+      }
       if (!llmSvc) return markSummarizeUnavailable();
       let providers;
       try {
@@ -323,7 +328,7 @@ export default {
     const assetCache = new Map();
 
     async function locatePack(petId) {
-      if (!fsSvc) return null;
+      if (!fsSvc || !PET_ID_RE.test(String(petId || ''))) return null;
       for (const base of PACKS_DIR_CANDIDATES) {
         try {
           const target = await fsSvc.resolve(base + '/' + petId + '/spritesheet.png');
@@ -344,7 +349,9 @@ export default {
         handler: async (req, res) => {
           const url = new URL(req.url, 'http://localhost');
           const sid = url.searchParams.get('sessionId') || lastActiveSessionId;
-          const petId = url.searchParams.get('petId') || 'pikachu';
+          const petId = (url.searchParams.get('petId') && PET_ID_RE.test(url.searchParams.get('petId')))
+            ? url.searchParams.get('petId')
+            : 'pikachu';
           const e = bySession.get(sid) || emptyEntry();
           const { state, label } = computeState(sid);
           const now = Date.now();
@@ -367,7 +374,9 @@ export default {
         path: '/pet/asset',
         handler: async (req, res) => {
           const url = new URL(req.url, 'http://localhost');
-          const petId = url.searchParams.get('petId') || 'pikachu';
+          const petId = (url.searchParams.get('petId') && PET_ID_RE.test(url.searchParams.get('petId')))
+            ? url.searchParams.get('petId')
+            : 'pikachu';
           if (assetCache.has(petId)) {
             const cached = assetCache.get(petId);
             res.writeHead(200, { 'Content-Type': 'application/json' });

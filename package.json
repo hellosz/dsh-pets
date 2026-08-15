@@ -24,7 +24,30 @@
     "dsh-pets.mjs",
     "cordis.patch.yml",
     "lib/client.js",
-    "packs"
+    "packs",
+    "README.md"
   ],
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-tools": "*",
+    "react": "^18.2.0 || ^19.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hellosz/dsh-pets.git"
+  },
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "pet",
+    "petdex",
+    "codex-pets"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
   "license": "MIT"
 }

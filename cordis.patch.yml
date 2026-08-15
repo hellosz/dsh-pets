@@ -1,6 +1,9 @@
 # dsh-pets bundle patch：宠物伙伴插件的 Host 半区。
-# Host 状态引擎 + pet_say 工具 + 通知播报 + 素材路由都在包主入口 dsh-pets.mjs。
-# 注意：bundle 里的相对路径 name 会相对 profile 目录解析，所以这里必须用包名。
+# 本文件通过 package.json 的 dsh.bundle.patch 被 dsh profile boot 读取，
+# 作用是在 Cordis 插件树中插入一行 { id: dsh-pets, name: '@hellosz/dsh-pets' }。
+# 安装：`dsh plugin --profile web add @hellosz/dsh-pets`（或本地 file: 路径），
+# 等效于在 profile 的 dsh.profile.bundles 中追加本包名。
+# 注意：name 必须是包名（Cordis loader 按其解析包入口），id 可自行命名但需唯一。
 
 - insert:
     - id: dsh-pets
