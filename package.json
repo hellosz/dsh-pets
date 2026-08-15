@@ -1,6 +1,6 @@
 {
   "name": "@hellosz/dsh-pets",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "DeepSeek Harness pet companion — Codex Pets style floating pet with notification broadcasting and a pet_say tool",
   "type": "module",
   "main": "dsh-pets.mjs",
