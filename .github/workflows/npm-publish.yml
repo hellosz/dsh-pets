@@ -1,16 +1,15 @@
 # 发布到 npm registry。
-# 认证方式：npm Trusted Publishing（OIDC），不再使用长期 npm token。
-# 前置条件：npm 包已存在，并在 npm 包设置中配置了 GitHub Actions Trusted Publisher。
-# 触发方式：创建 GitHub Release（release.created）。
+# 认证方式：npm Trusted Publishing（OIDC），不需要长期 npm token。
+# 触发方式：推送 v* tag（例如 v0.2.2）。推送 tag 后会自动测试、发布 npm，并创建 GitHub Release。
 name: Node.js Package
 
 on:
-  release:
-    types: [created]
+  push:
+    tags:
+      - 'v*'
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   build:
@@ -39,3 +38,19 @@ jobs:
       - run: npm install -g npm@^11.15.0
       - run: npm install --ignore-scripts
       - run: npm publish --access public
+
+  github-release:
+    needs: publish-npm
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create GitHub Release
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --target "$GITHUB_SHA" \
+            --generate-notes \
+            --repo "$GITHUB_REPOSITORY"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
