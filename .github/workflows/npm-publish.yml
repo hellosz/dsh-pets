@@ -1,10 +1,16 @@
-# 当创建 GitHub Release 时，验证包语法并发布到 npm registry。
-# 触发方式：仓库 Releases → Draft a new release → 选择/新建 tag → Publish release。
+# 发布到 npm registry。
+# 认证方式：npm Trusted Publishing（OIDC），不再使用长期 npm token。
+# 前置条件：npm 包已存在，并在 npm 包设置中配置了 GitHub Actions Trusted Publisher。
+# 触发方式：创建 GitHub Release（release.created）。
 name: Node.js Package
 
 on:
   release:
     types: [created]
+
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
   build:
@@ -20,13 +26,16 @@ jobs:
   publish-npm:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org/
+      # Trusted Publishing 要求 npm >= 11.5.1；这里统一升到 11.15+。
+      - run: npm install -g npm@^11.15.0
       - run: npm install --ignore-scripts
-      - run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{secrets.npm_token}}
+      - run: npm publish --access public
